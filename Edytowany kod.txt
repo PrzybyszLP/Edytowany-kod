@@ -1,0 +1,158 @@
+import sys
+from time import *
+import math
+import sqlite3
+
+
+con = sqlite3.connect("baza.db")
+c = con.cursor()
+
+
+class BazaDanych():
+
+    @staticmethod
+    def create_table():
+        c.execute('CREATE TABLE IF NOT EXISTS tabela(nrewi TEXT NOT NULL, entrdate DATE, abondate DATE)')
+
+    @staticmethod
+    def read_record_from_db(nrewi):
+        c.execute("SELECT nrewi, entrdate, abondate FROM tabela WHERE nrewi = ?", (nrewi,))
+        data = c.fetchall()
+        return data
+
+    @staticmethod
+    def read_from_db():
+        c.execute("SELECT nrewi, entrdate, abondate FROM tabela")
+        data = c.fetchall()
+        return data
+
+    @staticmethod
+    def insert_record_to_db(nrewi, entrdate, abondate=None):
+        c.execute("INSERT INTO tabela (nrewi, entrdate, abondate) VALUES (? ,?, ?)", (nrewi, entrdate, abondate))
+        con.commit()
+
+    @staticmethod
+    def update_entrdate_in_db(nrewi, entrdate):
+        c.execute("UPDATE tabela SET entrdate = ? WHERE nrewi = ? ", (entrdate, nrewi))
+        con.commit()
+
+    @staticmethod
+    def delete_record_in_db(nrewi):
+        c.execute("DELETE FROM tabela WHERE nrewi = ?", (nrewi,))
+        con.commit()
+
+class Menu():
+    @staticmethod
+    def menu():
+        while True:
+            print('-' * 83)
+            print("WYDZIAŁ GEODEZJI".center(83))
+            print('-' * 83)
+            print("[W] Dodaj [U] Usuń [D} Działki [K] Koniec".center(83))
+            print('-' * 83)
+            w = input()
+            if not w:
+                print("Nieznane polecenie")
+            else:
+                w = w[0].upper()
+                if w in 'WEPSKA':
+                    return w
+                print("Nieznane polecenie")
+
+class Działki():
+    @staticmethod
+    def działki():
+        print("-" * 75)
+        print("Lista działek w systemie".center(75))
+        print("-" * 75)
+        print("|" + "Nr ewi.".center(10) + "|" + "Godz. dodania".center(20) + "|")
+        print("-" * 75)
+        for record in BazaDanych.read_from_db():
+            if record[1]:
+                if record[2]:
+                    print("|%9s |" % record[0], strftime("%H:%M (%Y-%m-%d)", localtime(record[1])), "|"
+                          + "TAK".center(20) + "|", strftime("%H:%M (%Y-%m-%d)", localtime(record[2])) + "|")
+                else:
+                    print("|%9s |" % record[0], strftime("%H:%M (%Y-%m-%d)", localtime(record[1])), "|"
+                          + "NIE".center(20) + "|")
+        print("-" * 75)
+
+    @staticmethod
+    def usuń():
+        print("Usuwanie działki z systemu - godzina", strftime("%H:%M (%Y-%m-%d)"))
+        print("Podaj nr ewidencyjny")
+        ewi = input()[:9].upper()
+        if not ewi:
+            print("Nieznane polecenie")
+        else:
+            if BazaDanych.read_record_from_db(
+                    ewi):
+                if BazaDanych.read_record_from_db(ewi)[0][
+                    2]:
+                    godz = localtime(BazaDanych.read_record_from_db(ewi)[0][
+                                         1])
+                    print("Godzina dodania: ", strftime("%H:%M (%Y-%m-%d)", godz))
+                    BazaDanych.update_entrdate_in_db(ewi, None)
+                else:
+                    godz = localtime(BazaDanych.read_record_from_db(ewi)[0][
+                                         1])
+                    print("Godzina dodania: ", strftime("%H:%M (%Y-%m-%d)", godz))
+                    minuty = int(mktime(localtime()) - mktime(godz)) / 60
+                    BazaDanych.delete_record_in_db(ewi)
+            else:
+                print("Blad!: Takiej działki nie ma w systemie!")
+
+    @staticmethod
+    def dodaj():
+        godz = mktime(localtime())
+        print("Dodanie działki do systemu - godzina", strftime("%H:%M (%Y-%m-%d)", localtime(godz)))
+        ewi = input("Podaj numer ewidencyjny działki: ")[:9].upper()
+        if not ewi:
+            print("Nieznane polecenie")
+        else:
+            if not BazaDanych.read_record_from_db(
+                    ewi):
+                BazaDanych.insert_record_to_db(ewi, godz)
+                print("Wprowadzono")
+            elif not BazaDanych.read_record_from_db(ewi)[0][
+                1]:
+                BazaDanych.update_entrdate_in_db(ewi, godz)
+            else:
+                print("Blad! Działka o tym numerze ewidencyjnym jest już w sytemie!")
+
+    def wybor():
+        while True:
+            w = Menu.menu()
+            if w == "K":
+                break
+            elif w == "D":
+                Działki.działki()
+            elif w == "U":
+                Działki.usuń()
+            elif w == "W":
+                Działki.dodaj()
+
+    def init():
+        try:
+            BazaDanych.create_table()
+        except Exception:
+            print("Blad krytyczny! Baza danych nie zostala otwarta!")
+            sys.exit(0)
+        print("Inicjalizacja udana. Bazy danych zostaly otworzone")
+
+    if __name__ == "__main__":
+        init()
+        try:
+            wybor()
+        except Exception:
+            print("Wystapil powazny blad!")
+        c.close()
+        con.close()
+
+
+
+
+
+
+
+
